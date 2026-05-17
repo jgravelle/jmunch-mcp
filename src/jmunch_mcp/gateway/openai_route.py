@@ -246,8 +246,9 @@ def _compact_base_messages(base: list[Any]) -> list[Any]:
 
     Aggressive compaction: drop the app's original system prompt, drop the
     app's original tool_call chain, and fold everything the model needs
-    into a single system message (drill-in instructions + user question +
-    handle info). The result is a minimal `[system]` base; callers append
+    into a system message. The result is a `[system]` base plus a `[user]`
+    placeholder to satisfy upstream providers that reject requests with no
+    user-role message (e.g. Airrouter/litellm). Callers append
     `[system_prior_verbs?, assistant(latest_verb), tool(latest_result)]`
     on top of it for each drill-in turn.
     """
@@ -257,7 +258,12 @@ def _compact_base_messages(base: list[Any]) -> list[Any]:
         parts.append(f"The user's request was:\n{user_text}")
     if handle_env:
         parts.append(f"A large payload has been registered as a handle:\n{handle_env}")
-    return [{"role": "system", "content": "\n\n".join(parts)}]
+    result = [{"role": "system", "content": "\n\n".join(parts)}]
+    # Preserve a user-role message so upstream providers that require one
+    # don't reject the follow-up request with "No user query found in messages".
+    if user_text:
+        result.append({"role": "user", "content": user_text})
+    return result
 
 
 def _prior_verbs_note(trail: list[dict[str, Any]]) -> str:
