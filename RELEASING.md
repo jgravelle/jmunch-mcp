@@ -177,3 +177,21 @@ command run from the repo root.
 ⚠ Literal paths only - no `~`, no `%USERPROFILE%`, no `$env:USERPROFILE`. Each
 has failed at this prompt mid-release. `login` alone is invalid; the auth method
 is a required argument.
+
+⚠⚠ **`login` writes `.mcpregistry_github_token` and `.mcpregistry_registry_token`
+into the repo root.** They are live credentials, they are gitignored as of
+2026-09-01, and the sdist allowlist excludes them - but both locks were added
+only after a login put them there. Delete them once the publish succeeds:
+
+```bash
+rm -f .mcpregistry_*
+```
+
+⚠ **Validate `server.json` before typing the publish.** The registry rejects a
+description over 100 characters with a 422, and the token lives five minutes, so
+a rejection costs a full round trip through `login`.
+`tests/test_version_sync.py` checks this in milliseconds:
+
+```bash
+PYTHONPATH=src python -m pytest tests/test_version_sync.py -q
+```

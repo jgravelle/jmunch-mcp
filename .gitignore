@@ -48,3 +48,8 @@ bench/nanobot/demo/gateway-right.toml
 # file that .gitignore does not name ships in the sdist. See RELEASING.md.
 configs/*.local.toml
 *.bak-*
+
+# mcp-publisher writes these into the REPO ROOT at login. Untracked and, until
+# named here, unignored - the one shape that reaches an sdist. The sdist
+# allowlist also excludes them; this is the second lock.
+.mcpregistry_*
