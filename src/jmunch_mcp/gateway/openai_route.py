@@ -550,7 +550,7 @@ async def stream_chat_completions(
             log.warning("upstream %s %d: %s", spec.name, e.status, e.body[:500])
             err = make_error(UPSTREAM_ERROR, f"upstream {spec.name} returned {e.status}: {e.body[:300]}",
                              status=e.status)
-            return 502, encode_as_sse({"error": err})
+            return e.status, [b"data: " + json.dumps(err).encode("utf-8") + b"\n\n", b"data: [DONE]\n\n"]
 
         loop_result = await _verb_loop(
             first_response=first, working=working,
@@ -562,7 +562,7 @@ async def stream_chat_completions(
             err = make_error(UPSTREAM_ERROR,
                              f"upstream {spec.name} returned {loop_result.status}: {loop_result.body[:300]}",
                              status=loop_result.status)
-            return 502, encode_as_sse({"error": err})
+            return loop_result.status, [b"data: " + json.dumps(err).encode("utf-8") + b"\n\n", b"data: [DONE]\n\n"]
         final_response = loop_result
     finally:
         await upstream.close()
