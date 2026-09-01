@@ -1,7 +1,7 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.jgravelle/jmunch-mcp",
-  "description": "Transparent MCP proxy that cuts the token cost of large tool responses. Wraps any upstream server and turns fat payloads into queryable handles.",
+  "description": "Transparent MCP proxy. Turns fat tool responses into queryable handles: 88-99% fewer tokens.",
   "repository": {
     "url": "https://github.com/jgravelle/jmunch-mcp",
     "source": "github"

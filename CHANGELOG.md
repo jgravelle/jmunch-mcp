@@ -18,7 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   really ignored.
 - `server.json` for the MCP registry, and `tests/test_version_sync.py` to gate
   it against `pyproject.toml` — including `packages[].version`, which the
-  registry will happily accept moving on its own.
+  registry will happily accept moving on its own. The same file pins the
+  registry's own schema constraints: the first publish attempt was rejected
+  422 on a 141-character description against a 100-character limit, and the
+  publish is human-typed with a five-minute token, so a rejection there costs a
+  full round trip.
 - `CLAUDE.md` and `RELEASING.md`.
 
 ### Fixed

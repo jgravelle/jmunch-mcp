@@ -76,3 +76,47 @@ def test_every_pin_site_is_known():
         f"New version pin site(s): {sorted(unexpected)}. Add them to RELEASING.md "
         "step 1 and to `known` here, or the next bump will miss them."
     )
+
+
+# ---------------------------------------------------------------------------
+# Registry schema constraints
+#
+# Restated from the ServerDetail definition in
+# https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json
+# read 2026-09-01. Literals on purpose: fetching the schema at test time would
+# make the suite depend on the network, and a pin that reads the value it checks
+# asserts nothing.
+#
+# The publish is typed by a human and the JWT lives five minutes, so a rejection
+# there costs a full round trip. On 2026-09-01 the first attempt failed with
+# 422 on a 141-character description. These run in milliseconds instead.
+# ---------------------------------------------------------------------------
+
+_MAX_DESCRIPTION = 100
+_MAX_NAME = 200
+_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9.-]+/[a-zA-Z0-9._-]+$")
+_REQUIRED = ("name", "description", "version")
+
+
+def _server_json() -> dict:
+    return json.loads((REPO / "server.json").read_text(encoding="utf-8"))
+
+
+def test_server_json_meets_registry_constraints():
+    server = _server_json()
+
+    for field in _REQUIRED:
+        assert server.get(field), f"registry requires a non-empty {field!r}"
+
+    desc = server["description"]
+    assert len(desc) <= _MAX_DESCRIPTION, (
+        f"description is {len(desc)} chars; the registry rejects anything over "
+        f"{_MAX_DESCRIPTION} with a 422. Shorten it before publishing."
+    )
+
+    name = server["name"]
+    assert len(name) <= _MAX_NAME
+    assert _NAME_PATTERN.match(name), (
+        f"name {name!r} must match {_NAME_PATTERN.pattern} - "
+        "'<namespace>/<server>', e.g. io.github.jgravelle/jmunch-mcp"
+    )
