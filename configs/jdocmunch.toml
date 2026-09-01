@@ -8,3 +8,9 @@ report = false
 [upstream]
 command = "jdocmunch-mcp"
 args = []
+
+# Moved here 2026-08-16. This was set in ~/.claude/settings.json on a jdocmunch
+# entry that .claude.json shadowed, so it never reached the running upstream.
+# proxy.py merges upstream.env over os.environ before spawning the child.
+[upstream.env]
+JDOCMUNCH_EMBED_WARMUP = "0"

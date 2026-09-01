@@ -42,3 +42,9 @@ bench/nanobot/gateway-on-7880.toml
 bench/nanobot/demo/demo_doc.txt
 bench/nanobot/demo/gateway-left.toml
 bench/nanobot/demo/gateway-right.toml
+
+# Local upstream overrides: these carry real credentials and MUST NOT be
+# committed or built. Hatchling builds from the WORKING TREE, so an untracked
+# file that .gitignore does not name ships in the sdist. See RELEASING.md.
+configs/*.local.toml
+*.bak-*
