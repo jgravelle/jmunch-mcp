@@ -168,18 +168,18 @@ def _infer_columns(rows: list[dict[str, Any]]) -> tuple[list[str], dict[str, str
 
     types: dict[str, str] = {}
     for col in seen:
-        t_int = t_real = t_text = False
+        # Track only what WIDENS the type. INTEGER is the floor, so an int (or a
+        # bool, which is an int subclass) needs no flag of its own.
+        t_real = t_text = False
         any_non_null = False
         for row in rows[:_SAMPLE_ROWS]:
             v = row.get(col)
             if v is None:
                 continue
             any_non_null = True
-            if isinstance(v, bool):
-                t_int = True
-            elif isinstance(v, int):
-                t_int = True
-            elif isinstance(v, float):
+            if isinstance(v, (bool, int)):
+                continue
+            if isinstance(v, float):
                 t_real = True
             else:
                 t_text = True

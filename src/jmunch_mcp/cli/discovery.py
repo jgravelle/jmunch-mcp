@@ -338,7 +338,7 @@ def scan_local_configs() -> list[Candidate]:
                 command=command,
                 args=args,
                 source=f"local-toml:{toml_path}",
-                description=f"Prepared by init — not wired into any client",
+                description="Prepared by init — not wired into any client",
             ))
     return found
 

@@ -12,8 +12,6 @@ Designed to be useful non-interactively (`--yes`) and safe (`--dry-run`,
 from __future__ import annotations
 
 import argparse
-import json
-import os
 import re
 import shutil
 import sys

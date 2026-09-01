@@ -67,3 +67,33 @@ def test_search_substring():
     b = TabularBackend(ROWS)
     hits = b.search("auth")
     assert {r["id"] for r in hits} == {1, 3}
+
+
+def test_column_type_inference_covers_every_branch():
+    """Pins `_infer_columns` across all four outcomes.
+
+    Written before refactoring away a vestigial `t_int` flag, so the refactor
+    had something to be checked against. bool is a subclass of int, which is
+    the case most likely to break under a rewrite: True must widen to INTEGER,
+    never to TEXT.
+    """
+    from jmunch_mcp.backends.tabular import _infer_columns
+
+    _, types = _infer_columns([
+        {"i": 1, "f": 1.5, "s": "x", "b": True, "mixed": 1, "nulls": None},
+        {"i": 2, "f": 2.0, "s": "y", "b": False, "mixed": "now text", "nulls": None},
+    ])
+
+    assert types["i"] == "INTEGER"
+    assert types["f"] == "REAL"
+    assert types["s"] == "TEXT"
+    assert types["b"] == "INTEGER", "bool is an int subclass and must not read as TEXT"
+    assert types["mixed"] == "TEXT", "any text in the sample widens the column to TEXT"
+    assert types["nulls"] == "TEXT", "an all-null column defaults to TEXT"
+
+
+def test_int_then_float_widens_to_real():
+    from jmunch_mcp.backends.tabular import _infer_columns
+
+    _, types = _infer_columns([{"n": 1}, {"n": 2.5}])
+    assert types["n"] == "REAL"
