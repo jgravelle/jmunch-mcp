@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
 
 from jmunch_mcp.cli import rewrite
 from jmunch_mcp.cli.discovery import Candidate
@@ -19,7 +18,7 @@ def _candidate_for(cfg_path: Path, key: str, entry: dict) -> Candidate:
         name=key,
         command=entry["command"],
         args=tuple(entry.get("args", [])),
-        source=f"client:Test",
+        source="client:Test",
         source_path=cfg_path,
         server_key=key,
     )

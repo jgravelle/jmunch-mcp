@@ -8,7 +8,6 @@ import asyncio
 import json
 from typing import Any
 
-import pytest
 
 from jmunch_mcp.gateway.config import (
     GatewayConfig,

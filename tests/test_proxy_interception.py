@@ -8,7 +8,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
 
 from jmunch_mcp.config import Config, UpstreamConfig
 from jmunch_mcp.meta import SavingsTracker

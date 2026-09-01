@@ -31,9 +31,9 @@ stack, so it carries the same hazards with none of the automation.
    Read the **skip count**, not only the exit code. A jump in skips means the
    environment changed, not the code.
 
-4. **Run the linter.** `uv run ruff check src/`. It is not wired to anything, so
-   it fails silently by never running. Compare against the previous release
-   rather than expecting zero — this repo carries pre-existing findings.
+4. **Run the linter.** `uv run ruff check src/ tests/`. It is not wired to
+   anything, so it fails silently by never running. **Expect zero findings.**
+   The repo was brought to clean on 2026-09-01, so any finding is new.
 
 5. **Commit and push** before any irreversible step.
 
@@ -118,8 +118,16 @@ This is not hypothetical. Cutting 0.2.2 required stashing
 otherwise bound for the artifact — along with two modified `configs/*.toml`
 carrying local-only workarounds.
 
-Until an explicit sdist target block exists, **inspect the sdist before every
-upload**:
+**Closed 2026-09-01.** `[tool.hatch.build.targets.sdist]` now declares an
+allowlist, so anything not named there is out by default rather than in by
+default. Verified by building against planted decoys (`.env`, a `*.bak-*`, a
+`*.local.toml`): none reached the artifact.
+
+`tests/test_no_inline_credentials.py` is the check one step earlier — a real
+secret in a tracked config fails the suite before any build happens.
+
+Inspecting the sdist is still cheap, and the allowlist only protects paths it
+was told about:
 
 ```bash
 tar tzf dist/*X.Y.Z*.tar.gz | grep -iE '\.claude|\.bak|\.env|secret' || echo "clean"

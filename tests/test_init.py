@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
-import pytest
 
 from jmunch_mcp.cli import discovery, init
 from jmunch_mcp.cli.discovery import Candidate, discover, scan_client_configs

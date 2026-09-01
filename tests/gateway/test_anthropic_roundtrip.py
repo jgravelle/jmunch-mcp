@@ -9,7 +9,6 @@ import asyncio
 import json
 from typing import Any, AsyncIterator
 
-import pytest
 
 from jmunch_mcp.gateway.anthropic_route import handle_messages, stream_messages
 from jmunch_mcp.gateway.anthropic_sse import (
