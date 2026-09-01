@@ -8,6 +8,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Streaming upstream errors reached the client as an empty turn.** Error dicts
+  were handed to the *completion* encoders: `encode_as_sse` walks `choices` and
+  `encode_message_as_sse` walks `content`, and an error has neither, so the
+  client received a well-formed chunk carrying nothing and the OpenAI SDK raised
+  a bare `RuntimeError` with the upstream message gone. Reported and fixed for
+  the two OpenAI streaming paths by @iamfoz (#5).
+- **The same defect at three more sites, found reviewing #5.** The OpenAI
+  bad-upstream-kind path (`openai_route.py`) had the identical empty-chunk
+  failure four lines above the contributed fix. Both Anthropic streaming error
+  paths, plus its bad-upstream-kind path, dressed the failure as an assistant
+  message whose text happened to be JSON — which an SDK reads as a successful
+  reply, not an error.
+- **Upstream status codes are no longer flattened to 502.** All four sites
+  hardcoded it, so a 429 rate limit arrived as a server error and clients could
+  not tell a throttle from an outage. Each now returns what the upstream sent.
+
+### Added
+- `encode_error_as_sse()` in `gateway/anthropic_sse.py` emits a real Anthropic
+  `error` event rather than a synthetic assistant turn.
+- `tests/gateway/test_streaming_errors.py` covers all four paths. Verified to
+  fail against the pre-fix code, not merely to pass against the new.
+
+### Fixed
 - **`_meta.cost_avoided` overstated Claude Opus savings by 3x.**
   `_MODEL_PRICES_PER_1M["claude_opus"]` was $15.00/MTok, the retired Opus
   4.1/4.0 input rate. Every current Opus — 5, 4.8, 4.7, 4.6 — is $5.00/MTok, so

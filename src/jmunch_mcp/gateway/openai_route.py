@@ -524,7 +524,7 @@ async def stream_chat_completions(
             "message": f"upstream '{spec.name}' is kind={spec.kind}",
             "type": "jmunch_bad_upstream",
         }}
-        return 400, encode_as_sse(resp)
+        return 400, [b"data: " + json.dumps(resp).encode("utf-8") + b"\n\n", b"data: [DONE]\n\n"]
 
     started_ns = time.perf_counter_ns()
     raw_request_bytes = len(json.dumps(req_body, default=str))

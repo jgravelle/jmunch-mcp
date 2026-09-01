@@ -99,6 +99,18 @@ def assemble_message_from_events(events: list[dict[str, Any]]) -> dict[str, Any]
     return msg
 
 
+def encode_error_as_sse(err: dict[str, Any]) -> list[bytes]:
+    """Emit an upstream failure as an Anthropic `error` event.
+
+    The alternative — dressing the error up as an assistant message whose text
+    happens to be JSON — reaches the client as a successful turn, so an SDK
+    reports a model reply rather than a failure. Anthropic's stream spec has a
+    real error event; use it.
+    """
+    payload = json.dumps({"type": "error", "error": err}, default=str)
+    return [b"event: error\ndata: " + payload.encode("utf-8") + b"\n\n"]
+
+
 def encode_message_as_sse(message: dict[str, Any]) -> list[bytes]:
     """Re-emit a non-streaming Message as Anthropic-shaped SSE events.
 

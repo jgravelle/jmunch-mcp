@@ -25,6 +25,7 @@ from ..registry import HandleRegistry
 from ..verbs import Dispatcher
 from .anthropic_sse import (
     assemble_message_from_events,
+    encode_error_as_sse,
     encode_message_as_sse,
     parse_anthropic_sse,
 )
@@ -321,11 +322,9 @@ async def stream_messages(
     model_s = model if isinstance(model, str) else None
     spec = config.resolve_upstream(header=upstream_override, model=model_s)
     if spec.kind != "anthropic":
-        return 400, encode_message_as_sse({
-            "type": "message", "role": "assistant",
-            "content": [{"type": "text", "text": f"bad upstream kind={spec.kind}"}],
-            "stop_reason": "end_turn",
-        })
+        return 400, encode_error_as_sse(
+            make_error(UPSTREAM_ERROR, f"upstream '{spec.name}' is kind={spec.kind}", status=400)
+        )
 
     started_ns = time.perf_counter_ns()
     raw_request_bytes = len(json.dumps(req_body, default=str))
@@ -347,11 +346,7 @@ async def stream_messages(
         except UpstreamError as e:
             err = make_error(UPSTREAM_ERROR, f"upstream {spec.name} returned {e.status}",
                              status=e.status)
-            return 502, encode_message_as_sse({
-                "type": "message", "role": "assistant",
-                "content": [{"type": "text", "text": json.dumps(err)}],
-                "stop_reason": "end_turn",
-            })
+            return e.status, encode_error_as_sse(err)
         first = assemble_message_from_events(events)
         loop_result = await _verb_loop(
             first_response=first, working=working,
@@ -360,11 +355,7 @@ async def stream_messages(
         if isinstance(loop_result, UpstreamError):
             err = make_error(UPSTREAM_ERROR, f"upstream {spec.name} returned {loop_result.status}",
                              status=loop_result.status)
-            return 502, encode_message_as_sse({
-                "type": "message", "role": "assistant",
-                "content": [{"type": "text", "text": json.dumps(err)}],
-                "stop_reason": "end_turn",
-            })
+            return loop_result.status, encode_error_as_sse(err)
         final = loop_result
     finally:
         await upstream.close()
