@@ -21,11 +21,20 @@ RETRIEVAL_ENGINE = "jmunch"
 RETRIEVAL_VERSION = "1.0"
 POWERED_BY = "jmunch-mcp by jgravelle · https://github.com/jgravelle/jmunch-mcp"
 
-# Per-model USD per 1M input tokens. Same spirit as the jCodeMunch/jDocMunch
-# cost table; keep in sync as pricing shifts.
+# Per-model USD per 1M INPUT tokens. Verified 2026-09-01 against
+# platform.claude.com/docs/en/about-claude/pricing.
+# ⚠⚠ A key that names a FAMILY inherits whichever member's price someone last
+# looked at. Price the CURRENT member and name it; a superseded member's rate
+# goes in the comment, never in the value.
+# Keys are wire-visible in _meta.cost_avoided — do not rename them.
 _MODEL_PRICES_PER_1M: dict[str, float] = {
-    "claude_opus": 15.00,
-    "claude_sonnet": 3.00,
+    # Claude Opus 5 (also 4.8/4.7/4.6). Superseded: Opus 4.1/4.0 were $15.00.
+    "claude_opus": 5.00,
+    # Claude Sonnet 5. The $2 launch price became standard on 2026-08-31; the
+    # increase to $3 scheduled for 2026-09-01 was cancelled. Superseded:
+    # Sonnet 4.6/4.5 are $3.00.
+    "claude_sonnet": 2.00,
+    # Not an Anthropic model; value unverified against any first-party source.
     "gpt5_latest": 10.00,
 }
 

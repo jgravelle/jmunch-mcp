@@ -5,6 +5,37 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **`_meta.cost_avoided` overstated Claude Opus savings by 3x.**
+  `_MODEL_PRICES_PER_1M["claude_opus"]` was $15.00/MTok, the retired Opus
+  4.1/4.0 input rate. Every current Opus — 5, 4.8, 4.7, 4.6 — is $5.00/MTok, so
+  the dollar figure stamped on every tool response was three times the real
+  avoided cost for the default model most users run. Corrected to $5.00,
+  verified 2026-09-01 against the Base Input Tokens column on
+  platform.claude.com/docs/en/about-claude/pricing.
+- **`claude_sonnet` was priced from a rate increase that never happened.**
+  The table held $3.00/MTok, which is Sonnet 4.6's rate and was also the
+  scheduled 2026-09-01 increase for Sonnet 5. Anthropic cancelled that
+  increase; $2.00/MTok is now the standard Sonnet 5 price. Corrected to $2.00.
+  A constant written for a future date is wrong for the whole interval before
+  it and reads identically to a stale one — the date next to it is what makes
+  the wrong value look checked.
+
+### Unchanged
+- `gpt5_latest` stays at $10.00/MTok. It is not an Anthropic model and no
+  verified first-party source was consulted for this change, so the value was
+  left alone rather than adjusted on a guess.
+- The three keys keep their existing names. They are emitted verbatim in
+  `_meta.cost_avoided` on every response; renaming them to spell out the model
+  version would break anything parsing that block.
+
+### Added
+- `tests/test_meta.py` pins both rates as restated literals plus a
+  `cost_avoided()` round-trip, so the next drift fails the suite instead of
+  shipping.
+
 ## [0.2.1] — 2026-04-30
 
 ### Fixed
