@@ -1,5 +1,7 @@
 # jmunch-mcp
 
+<!-- mcp-name: io.github.jgravelle/jmunch-mcp -->
+
 Transparent MCP proxy that reduces the token cost of large upstream tool responses for nearly every other MCP server imaginable. Wraps a single upstream MCP, forwards every call, and handle-ifies fat payloads into content-aware backends the agent can query with a small set of universal verbs (`peek`, `slice`, `search`, `aggregate`, `describe`, `list_handles`).
 
 ## Benchmarks

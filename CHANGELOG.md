@@ -5,6 +5,15 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.3] — 2026-09-01
+
+### Added
+- `<!-- mcp-name: io.github.jgravelle/jmunch-mcp -->` in `README.md`. The MCP
+  registry proves PyPI-name ownership by looking for this marker in the
+  **published package** README, so publishing 0.2.2 failed 400 without it.
+  PyPI versions are immutable, which is why a marker is a release rather than an
+  edit. `tests/test_version_sync.py` keeps it in step with `server.json`.
+
 ## [Unreleased]
 
 ### Added

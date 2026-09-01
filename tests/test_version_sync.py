@@ -120,3 +120,26 @@ def test_server_json_meets_registry_constraints():
         f"name {name!r} must match {_NAME_PATTERN.pattern} - "
         "'<namespace>/<server>', e.g. io.github.jgravelle/jmunch-mcp"
     )
+
+
+def test_readme_carries_the_registry_ownership_marker():
+    """The registry proves you own the PyPI name by looking for this marker in
+    the PUBLISHED package README - not in the GitHub one.
+
+    Publishing 0.2.2 failed 400 without it:
+      "PyPI package 'jmunch-mcp' ownership validation failed. The server name
+       must appear as 'mcp-name: ...' in the package README"
+
+    The consequence is the expensive part: PyPI versions are immutable, so
+    adding the marker means cutting a NEW release, not editing a file. Keeping
+    it in step with server.json costs nothing here and a whole version bump if
+    it drifts.
+    """
+    name = _server_json()["name"]
+    readme = (REPO / "README.md").read_text(encoding="utf-8")
+    marker = f"<!-- mcp-name: {name} -->"
+    assert marker in readme, (
+        f"README.md must contain {marker!r} for registry ownership validation. "
+        "Without it, `mcp-publisher publish` fails 400 - and fixing it after a "
+        "release requires another release, because PyPI versions are immutable."
+    )
