@@ -195,3 +195,43 @@ a rejection costs a full round trip through `login`.
 ```bash
 PYTHONPATH=src python -m pytest tests/test_version_sync.py -q
 ```
+
+### Ownership validation reads PyPI, not GitHub
+
+⚠⚠ The registry proves you own the PyPI name by finding this marker in the
+**published package README** - what PyPI renders, not what is in the repo:
+
+```
+<!-- mcp-name: io.github.jgravelle/jmunch-mcp -->
+```
+
+**PyPI versions are immutable, so committing the marker changes nothing the
+registry can see.** It keeps reading the newest *published* version. Adding the
+marker therefore costs a whole release, not an edit - that is what 0.2.3 was,
+one HTML comment and no functional change.
+
+`tests/test_version_sync.py` asserts the marker matches `server.json`'s name, so
+drift fails the suite instead of costing another version.
+
+### Order matters on a first publish
+
+1. Marker in `README.md`, committed.
+2. **PyPI upload of a version containing it.**
+3. Registry publish.
+
+Running step 3 before step 2 has propagated fails 400 on ownership validation,
+against a token that has already started its five-minute clock.
+
+### Reading PyPI after an upload
+
+⚠ **The JSON endpoint lags; the simple index does not.** Measured twice on
+2026-09-01: `pypi.org/pypi/<pkg>/json` reported the previous version with zero
+files for the new one, minutes after a successful upload, while
+`pypi.org/simple/<pkg>/` already listed both artifacts.
+
+**A stale read is not a failed upload.** Check the simple index - it is also what
+`pip` and `uv` actually resolve against:
+
+```bash
+curl -s https://pypi.org/simple/jmunch-mcp/ | grep -o 'jmunch_mcp-[0-9.]*\(-py3-none-any\.whl\|\.tar\.gz\)' | sort -u
+```

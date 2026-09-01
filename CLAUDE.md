@@ -62,9 +62,10 @@ Stated because their absence is easy to mistake for a gap in your search:
 - **No CLA app.** A fork PR showing zero commit statuses means no app is
   installed, *not* an unsigned agreement. The shared skill's "absent means NOT
   SIGNED" rule was measured on repos where CLA Assistant actually posts.
-- **Not yet published to the MCP registry.** `server.json` exists as of
-  2026-09-01, but publishing is a human-typed step — see `RELEASING.md`. Query
-  the registry for the current state; never quote it from a document.
+- **In the MCP registry since 2026-09-01** (first publish, 0.2.3). Publishing is
+  a human-typed step — see `RELEASING.md`, and note that ownership validation
+  reads the *published PyPI* README, so the `mcp-name:` marker costs a release
+  rather than an edit. Query the registry for current state; never quote it.
 - **Two version pin sites** — `pyproject.toml` and `server.json`, the latter
   carrying it twice. `tests/test_version_sync.py` gates them, and fails when a
   new file starts carrying the version.
