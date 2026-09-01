@@ -5,6 +5,35 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- `[tool.hatch.build.targets.sdist]` allowlist. The sdist had no target block, so
+  contents fell back to hatchling's default selection — which honors
+  `.gitignore`, making `.gitignore` the only thing between a working-tree file
+  and PyPI. An allowlist inverts the default: a path is out unless named.
+  Verified against planted decoys (`.env`, `*.bak-*`, `*.local.toml`).
+- `tests/test_no_inline_credentials.py` fails the suite on a secret in a tracked
+  config, and asserts the gitignored `configs/*.local.toml` escape hatch is
+  really ignored.
+- `server.json` for the MCP registry, and `tests/test_version_sync.py` to gate
+  it against `pyproject.toml` — including `packages[].version`, which the
+  registry will happily accept moving on its own.
+- `CLAUDE.md` and `RELEASING.md`.
+
+### Fixed
+- Six ruff findings in `src/` and ten in `tests/`, which had never been in
+  scope. One was not lint: a `t_int` flag in `_infer_columns` assigned and never
+  read. Type inference had a single assertion covering it, so tests for all four
+  outcomes went in first — bool is an int subclass and must widen to INTEGER —
+  and the flag was then removed.
+
+### Security
+- `configs/brave-search.toml` held a live `BRAVE_API_KEY` inline. Never
+  committed, never published — confirmed absent from the 0.2.2 sdist, the wheel,
+  and all git history — but present in the working tree, which is what hatchling
+  builds from. Moved to a gitignored `configs/*.local.toml`.
+
 ## [0.2.2] — 2026-09-01
 
 ### Fixed

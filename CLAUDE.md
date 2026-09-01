@@ -62,21 +62,24 @@ Stated because their absence is easy to mistake for a gap in your search:
 - **No CLA app.** A fork PR showing zero commit statuses means no app is
   installed, *not* an unsigned agreement. The shared skill's "absent means NOT
   SIGNED" rule was measured on repos where CLA Assistant actually posts.
-- **No `server.json`, and not in the MCP registry.** Verified 2026-09-01: the
-  query returns zero rows while the same query returns 57 for jcodemunch, so the
-  zero is real rather than the nested-parse false negative. First publish is
-  separate work, not part of a release.
-- **One version pin site** — `pyproject.toml`. No `plugin.json`, `uv.lock`, or
-  `whatsnew.json`. Re-run the enumeration anyway; the list grows.
+- **Not yet published to the MCP registry.** `server.json` exists as of
+  2026-09-01, but publishing is a human-typed step — see `RELEASING.md`. Query
+  the registry for the current state; never quote it from a document.
+- **Two version pin sites** — `pyproject.toml` and `server.json`, the latter
+  carrying it twice. `tests/test_version_sync.py` gates them, and fails when a
+  new file starts carrying the version.
 
 ## Standing hazards
 
 ⚠⚠ **The build reads the working tree, not `HEAD`.** Uncommitted edits to
 tracked files ship with their edits, and a file that is untracked *and*
-unignored ships too. `pyproject.toml` declares no sdist target, so contents fall
-back to hatchling's default — which does honor `.gitignore`, and that is the
-only thing keeping scratch files out. The protection is incidental, not
-declared.
+unignored ships too. Clean the tree before building; this has not changed.
+
+What did change on 2026-09-01 is the default.
+`[tool.hatch.build.targets.sdist]` now declares an allowlist, so a path is out
+unless named. Before that there was no sdist target and `.gitignore` was the
+only thing standing between a working-tree file and PyPI — incidental
+protection, not declared.
 
 ⚠⚠ **Real credentials belong in `configs/*.local.toml`, which is gitignored.**
 On 2026-09-01 `configs/brave-search.toml` was found holding a live
@@ -84,6 +87,8 @@ On 2026-09-01 `configs/brave-search.toml` was found holding a live
 present in the tree for months. The 0.2.2 sdist was clean only because the tree
 happened to be stashed before the build. Inline credentials in a built artifact
 are what got five jcodemunch releases yanked.
+`tests/test_no_inline_credentials.py` now fails the suite on a secret in a
+tracked config, which is the same catch one step earlier and free.
 
 ⚠ **Do not price a model family from whichever member you last looked at.**
 `_MODEL_PRICES_PER_1M` in `meta.py` is emitted verbatim in `_meta.cost_avoided`

@@ -10,14 +10,17 @@ stack, so it carries the same hazards with none of the automation.
 
 ## Steps
 
-1. **Bump the version.** There is one pin site: `pyproject.toml`. Confirm it is
-   still the only one:
+1. **Bump the version.** There are **two** pin sites: `pyproject.toml`, and
+   `server.json` - which carries it **twice**, at the top level and inside
+   `packages[]`. The registry accepts one moving without the other.
+
+   `tests/test_version_sync.py` gates all three values and fails when a *new*
+   file starts carrying the version, so the enumeration below is a cross-check
+   rather than the thing you rely on:
 
    ```bash
    grep -rn "<old-version>" --include=*.json --include=*.toml --include=*.lock .
    ```
-
-   The list grows. Do not trust this count without running the command.
 
 2. **Date the CHANGELOG.** Change `## [Unreleased]` to `## [X.Y.Z] — YYYY-MM-DD`.
 
@@ -101,33 +104,33 @@ A half-published version cannot be re-uploaded.
 ## The build reads your working tree, not `HEAD`
 
 ⚠⚠ Hatchling builds from the filesystem. Uncommitted edits to tracked files ship
-with their edits. **A file that is untracked *and* unignored also ships.**
+with their edits. **A file that is untracked *and* unignored also ships.** This
+is still true and is why step 6 cleans the tree first.
 
-`pyproject.toml` declares only `[tool.hatch.build.targets.wheel]`. There is no
-sdist target block, so sdist contents fall back to hatchling's default selection.
-That default does honor `.gitignore` (`ignore-vcs` defaults to false), which is
-why `.claude/` — line 36 of `.gitignore` — has stayed out of every published
-sdist. Verified 2026-09-01 by unpacking the 0.2.1 sdist from PyPI: 94 files, no
-`.claude/`, no `.bak`, no credentials.
+What changed on 2026-09-01 is the *default*.
+`[tool.hatch.build.targets.sdist]` now declares an allowlist, so a path is out
+unless it is named. Before that there was no sdist target at all, and contents
+fell back to hatchling's default selection. That default does honor `.gitignore`
+(`ignore-vcs` defaults to false), which is why `.claude/` never reached a
+published sdist — but it made `.gitignore` the only thing standing between a
+working-tree file and PyPI.
 
-**The protection is incidental, not declared.** `.gitignore` is doing it. Anything
-`.gitignore` does not name is in the sdist.
+**The old protection was incidental. The new one is declared.** Verified by
+building against planted decoys — a `.env`, a `*.bak-*`, and a `*.local.toml`:
+none reached the artifact.
 
-This is not hypothetical. Cutting 0.2.2 required stashing
-`configs/jdocmunch.toml.bak-20260816-reconcile` — untracked, unignored, and
-otherwise bound for the artifact — along with two modified `configs/*.toml`
-carrying local-only workarounds.
+That this mattered is not hypothetical. Cutting 0.2.2 required stashing
+`configs/jdocmunch.toml.bak-20260816-reconcile`, and the same stash turned out to
+be the only thing keeping a live `BRAVE_API_KEY` — sitting uncommitted in
+`configs/brave-search.toml` — out of the upload.
 
-**Closed 2026-09-01.** `[tool.hatch.build.targets.sdist]` now declares an
-allowlist, so anything not named there is out by default rather than in by
-default. Verified by building against planted decoys (`.env`, a `*.bak-*`, a
-`*.local.toml`): none reached the artifact.
+`tests/test_no_inline_credentials.py` catches that case one step earlier, where
+the fix is free: a real secret in a tracked config fails the suite before any
+build runs. Real credentials belong in `configs/*.local.toml`, which is
+gitignored.
 
-`tests/test_no_inline_credentials.py` is the check one step earlier — a real
-secret in a tracked config fails the suite before any build happens.
-
-Inspecting the sdist is still cheap, and the allowlist only protects paths it
-was told about:
+Inspecting the sdist is still cheap, and an allowlist only protects paths it was
+told about:
 
 ```bash
 tar tzf dist/*X.Y.Z*.tar.gz | grep -iE '\.claude|\.bak|\.env|secret' || echo "clean"
@@ -139,15 +142,38 @@ tar tzf dist/*X.Y.Z*.tar.gz | grep -iE '\.claude|\.bak|\.env|secret' || echo "cl
 there — `twine upload dist/*` with an old build present tries to re-upload a
 published version and fails the whole command. Clear `dist/` in step 6.
 
-## Not in the MCP registry
+## MCP registry
 
-jmunch-mcp has no `server.json` and has never been published to
-`registry.modelcontextprotocol.io`. Verified 2026-09-01: the query returns zero
-rows, and the same query shape returns 57 rows for jcodemunch, so the zero is
-real rather than a parse error.
+`server.json` exists as of 2026-09-01. Whether anything has been **published** is
+a live fact - query it, never quote it from here:
 
-The sibling repos' registry-publish step does not apply here. Adding it is
-separate work, not part of a release.
+```bash
+curl -s 'https://registry.modelcontextprotocol.io/v0/servers?search=jmunch&limit=100' -o reg.json
+```
 
-⚠ Query the registry; never quote a publication state from a document. The claim
-expires the moment someone publishes.
+⚠⚠ `&limit=100` is load-bearing; the default response is a page, not the set.
+
+⚠⚠ Rows are nested `{server: {...}, _meta: {...}}` - `name` and `version` live
+under `server`, `isLatest` under `_meta`. A flat `.name` read returns zero rows
+on a perfectly good publish. Before trusting a zero, run the same query against
+`search=jcodemunch`; a non-zero there proves the query shape works.
+
+The publish is **typed by a human**, not run by an agent: the device flow blocks
+on a browser and the JWT lives five minutes, so login and publish must be one
+command run from the repo root.
+
+- cmd.exe:
+
+  ```
+  cd /d C:\MCPs\jmunch-mcp && "C:\Users\j\mcp-publisher.exe" login github && "C:\Users\j\mcp-publisher.exe" publish
+  ```
+
+- PowerShell:
+
+  ```
+  cd C:\MCPs\jmunch-mcp; & "C:\Users\j\mcp-publisher.exe" login github; & "C:\Users\j\mcp-publisher.exe" publish
+  ```
+
+⚠ Literal paths only - no `~`, no `%USERPROFILE%`, no `$env:USERPROFILE`. Each
+has failed at this prompt mid-release. `login` alone is invalid; the auth method
+is a required argument.
