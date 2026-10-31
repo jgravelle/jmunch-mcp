@@ -98,6 +98,12 @@ jmunch-mcp dashboard --open       # also open in your default browser
 
 Flags: `--port` (default `7878`), `--host` (default `127.0.0.1`), `--db <path>` to point at a non-default metrics DB, `--open` to launch the browser. Metrics only populate once proxies have recorded calls, so run your client against a wrapped upstream first.
 
+## When the proxy exits
+
+The proxy ends when its client closes stdin, when its upstream exits, or when the process that started it is gone. It then closes the upstream's stdin and, if the upstream has not exited 3 seconds later, terminates it.
+
+For the last case a background thread checks the parent process every 5 seconds. It reads only the process table: nothing is written and nothing goes over the network. A parent it cannot check is never treated as gone. Set `JMUNCH_PARENT_WATCH_SECONDS` to change the interval, or to `0` to turn the check off.
+
 ## License
 
 jmunch-mcp is released under the [MIT License](LICENSE) — free to use, modify, distribute, and embed in commercial products.
