@@ -48,7 +48,7 @@ log = logging.getLogger("jmunch.proxy")
 STOP_GRACE_SECONDS = 3.0
 
 
-def _stdin_lines() -> "asyncio.Queue[bytes]":
+def _stdin_lines() -> asyncio.Queue[bytes]:
     """Lines from stdin, read on a daemon thread; b"" marks EOF.
 
     ⚠ Not ``loop.run_in_executor``: ``asyncio.run`` waits for the default

@@ -100,7 +100,7 @@ Flags: `--port` (default `7878`), `--host` (default `127.0.0.1`), `--db <path>` 
 
 ## When the proxy exits
 
-The proxy ends when its client closes stdin, when its upstream exits, or when the process that started it is gone. It then closes the upstream's stdin and, if the upstream has not exited 3 seconds later, terminates it. This reaches the process the proxy started; an upstream that is itself a wrapper (`npx.cmd` runs under `cmd.exe` on Windows) can leave its own child running.
+The proxy ends when its client closes stdin, when its upstream exits, or when the process that started it is gone. It then closes the upstream's stdin and, if the upstream has not exited 3 seconds later, terminates it, then kills it 3 seconds after that. This reaches the process the proxy started; an upstream that is itself a wrapper (`npx.cmd` runs under `cmd.exe` on Windows) can leave its own child running.
 
 For the last case a background thread checks the parent process every 5 seconds. It reads only the process table: nothing is written and nothing goes over the network. A parent it cannot check is never treated as gone. Set `JMUNCH_PARENT_WATCH_SECONDS` to change the interval, or to `0` to turn the check off.
 
