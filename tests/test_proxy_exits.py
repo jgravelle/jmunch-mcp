@@ -245,13 +245,67 @@ def test_a_changed_parent_is_gone(monkeypatch):
     assert w.gone() is True
 
 
-def test_a_failed_query_is_not_gone(monkeypatch):
-    """Uncertainty never exits: a process we cannot query may be alive."""
+class _FailingExitCode:
+    """Real kernel32, except that GetExitCodeProcess fails: the query error a
+    live parent can still produce."""
+
+    def __init__(self, real):
+        self._real = real
+
+    def __getattr__(self, name):
+        return getattr(self._real, name)
+
+    def GetExitCodeProcess(self, handle, code):
+        return 0
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows process query")
+def test_a_failed_exit_code_query_is_not_gone(monkeypatch):
+    """Review round 1: the earlier test mocked `_no_such_process` itself, which
+    said gone for any PID it could open. Patch the OS call instead."""
     w = lifeline.Watch.of_parent()
     assert w is not None
-    monkeypatch.setattr(lifeline, "_is_alive", lambda pid: False)
-    monkeypatch.setattr(lifeline, "_no_such_process", lambda pid: False)
+    real = lifeline._kernel32
+    monkeypatch.setattr(lifeline, "_kernel32", lambda: _FailingExitCode(real()))
     assert w.gone() is False
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX signal probe")
+def test_a_parent_we_may_not_signal_is_not_gone(monkeypatch):
+    w = lifeline.Watch.of_parent()
+    assert w is not None
+
+    def denied(pid, sig):
+        raise PermissionError(1, "Operation not permitted")
+
+    monkeypatch.setattr(lifeline.os, "kill", denied)
+    assert w.gone() is False
+
+
+def _walk(monkeypatch, created: dict[int, int]) -> int:
+    launcher = "C:/venv/Scripts/jmunch-mcp.exe"
+    images = {100: launcher, 200: "C:/client/node.exe"}
+    monkeypatch.setattr(lifeline.sys, "platform", "win32")
+    monkeypatch.setattr(lifeline.os, "getppid", lambda: 100)
+    monkeypatch.setattr(lifeline, "_launcher_images", lambda: {lifeline._norm(launcher)})
+    monkeypatch.setattr(lifeline, "_image_path", images.get)
+    monkeypatch.setattr(lifeline, "_parent_of", {100: 200}.get)
+    monkeypatch.setattr(lifeline, "_create_time", created.get)
+    return lifeline._watched_pid()
+
+
+def test_the_walk_steps_past_a_launcher_to_its_older_parent(monkeypatch):
+    assert _walk(monkeypatch, {100: 50, 200: 10}) == 200
+
+
+def test_the_walk_never_steps_to_a_younger_process_on_a_reused_pid(monkeypatch):
+    """Review round 1: the launcher's creator exited and its PID went to a newer
+    process. Watching that one could end the proxy when it ends."""
+    assert _walk(monkeypatch, {100: 50, 200: 90}) == 100
+
+
+def test_the_walk_stops_when_an_age_cannot_be_read(monkeypatch):
+    assert _walk(monkeypatch, {100: 50}) == 100
 
 
 def test_a_check_that_raises_is_not_gone(monkeypatch):
@@ -268,4 +322,7 @@ def test_a_check_that_raises_is_not_gone(monkeypatch):
 def test_the_disclosed_interval_is_the_default():
     readme = (Path(__file__).resolve().parents[1] / "README.md").read_text(encoding="utf-8")
     assert f"every {int(lifeline.DEFAULT_SECONDS)} seconds" in readme
+    from jmunch_mcp.proxy import STOP_GRACE_SECONDS
+
+    assert f"{int(STOP_GRACE_SECONDS)} seconds later" in readme
     assert lifeline.ENV in readme

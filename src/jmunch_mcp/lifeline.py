@@ -114,12 +114,20 @@ def _no_such_process(pid: int) -> bool:
     exited. A process we may not open is NOT reported gone."""
     if sys.platform == "win32":
         import ctypes
+        from ctypes import wintypes
 
         k = _kernel32()
         h = k.OpenProcess(_QUERY, False, pid)
         if h:
-            k.CloseHandle(h)
-            return True  # openable but not alive: exited, a handle keeps it listed
+            try:
+                # Openable: gone only if it reports an exit code. A failed
+                # query is uncertainty, not an exit (review round 1).
+                code = wintypes.DWORD()
+                if not k.GetExitCodeProcess(h, ctypes.byref(code)):
+                    return False
+                return code.value != _STILL_ACTIVE
+            finally:
+                k.CloseHandle(h)
         return ctypes.get_last_error() == 87  # ERROR_INVALID_PARAMETER: no such PID
     try:
         os.kill(pid, 0)
@@ -187,7 +195,10 @@ def _parent_of(pid: int) -> int | None:
             ("szExeFile", ctypes.c_wchar * 260),
         ]
 
-    k = ctypes.windll.kernel32
+    # A private handle: setting argtypes on ctypes.windll.kernel32 would change
+    # them for every other ctypes caller in the process.
+    k = ctypes.WinDLL("kernel32", use_last_error=True)
+    k.CloseHandle.restype = wintypes.BOOL
     k.CreateToolhelp32Snapshot.argtypes = [wintypes.DWORD, wintypes.DWORD]
     k.CreateToolhelp32Snapshot.restype = wintypes.HANDLE
     k.Process32FirstW.argtypes = [wintypes.HANDLE, ctypes.POINTER(_ENTRY)]
@@ -247,6 +258,13 @@ def _watched_pid() -> int:
                 break
             up = _parent_of(pid)
             if not up or up <= 1:
+                break
+            # Windows keeps the creator's PID after the creator exits and may
+            # hand that PID to a newer process. A real parent started first;
+            # anything else is unrelated, and watching it could end the proxy
+            # when it ends (review round 1).
+            up_start, here_start = _create_time(up), _create_time(pid)
+            if up_start is None or here_start is None or up_start > here_start:
                 break
             pid = up
     except Exception:

@@ -43,6 +43,10 @@ from .verbs import TOOL_SCHEMAS, Dispatcher, is_jmunch_tool
 
 log = logging.getLogger("jmunch.proxy")
 
+# Seconds the upstream gets to exit after its stdin closes, and again after a
+# terminate, before the next step. Disclosed in README "When the proxy exits".
+STOP_GRACE_SECONDS = 3.0
+
 
 def _stdin_lines() -> "asyncio.Queue[bytes]":
     """Lines from stdin, read on a daemon thread; b"" marks EOF.
@@ -132,10 +136,15 @@ class Proxy:
         self.metrics.close()
         return rc
 
-    async def _stop_upstream(self, grace: float = 3.0) -> None:
+    async def _stop_upstream(self, grace: float = STOP_GRACE_SECONDS) -> None:
         """End the upstream with us: close its stdin (its normal EOF), then
-        terminate it if it has not exited within ``grace`` seconds. Without
-        this a proxy that leaves for any reason but a client EOF orphans it."""
+        terminate it if it has not exited within ``grace`` seconds, then kill.
+        Without this a proxy that leaves for any reason but a client EOF
+        orphans it.
+
+        ⚠ This reaches the DIRECT child only. A wrapper upstream (``npx.cmd``
+        runs under ``cmd.exe`` on Windows) can leave its own child running.
+        """
         child = self._child
         if child is None or child.returncode is not None:
             return
@@ -145,20 +154,20 @@ class Proxy:
             await asyncio.wait_for(child.wait(), grace)
             return
         except asyncio.TimeoutError:
-            pass
+            log.debug("upstream still running %ss after EOF; terminating", grace)
         except Exception:
             log.debug("closing the upstream's stdin failed", exc_info=True)
-        try:
-            child.terminate()
-            await asyncio.wait_for(child.wait(), grace)
-        except ProcessLookupError:
-            pass
-        except Exception:
-            log.debug("terminating the upstream failed; killing it", exc_info=True)
+        for stop in (child.terminate, child.kill):
             try:
-                child.kill()
+                stop()
+                await asyncio.wait_for(child.wait(), grace)
+                return
+            except ProcessLookupError:
+                return
+            except asyncio.TimeoutError:
+                log.debug("upstream still running after %s", stop.__name__)
             except Exception:
-                log.debug("killing the upstream failed", exc_info=True)
+                log.debug("%s of the upstream failed", stop.__name__, exc_info=True)
 
     # -- c2s -----------------------------------------------------------------
 

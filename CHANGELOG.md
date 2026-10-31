@@ -36,7 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - The proxy exits when its upstream exits or its client is gone, and stops the
-  upstream when it leaves. It used to end only on a stdin EOF, and could not
+  upstream it started (the direct child) when it leaves. It used to end only on a stdin EOF, and could not
   always do even that: the stdin reader ran on asyncio's default executor,
   which `asyncio.run` waits for at shutdown, so an upstream that exited while
   the client held the pipe open left the proxy blocked in `readline` for good.
@@ -45,7 +45,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   answer. Stdin is now read on a daemon thread; a background thread checks the
   parent every 5 seconds (`JMUNCH_PARENT_WATCH_SECONDS`, `0` turns it off;
   disclosed in README "When the proxy exits"); and on the way out the upstream
-  gets its stdin closed, then a terminate after 3 seconds. A parent the check
+  gets its stdin closed, then a terminate after 3 seconds and a kill
+  after 3 more; an upstream that is itself a wrapper (`npx.cmd` under
+  `cmd.exe`) can still leave its own child running. A parent the check
   cannot query is never treated as gone. On Windows the check steps past the
   console-script launcher and the venv redirector, which outlive their client.
   `tests/test_proxy_exits.py` kills the parent with stdin held open.
