@@ -25,9 +25,11 @@ import json
 import logging
 import os
 import sys
+import threading
 import time
 from typing import Any
 
+from . import lifeline
 from .config import Config
 from .meta import SavingsTracker, envelope, timer_ms
 from .metrics import MetricsDB
@@ -40,6 +42,40 @@ from .backends.text import TextBackend
 from .verbs import TOOL_SCHEMAS, Dispatcher, is_jmunch_tool
 
 log = logging.getLogger("jmunch.proxy")
+
+# Seconds the upstream gets to exit after its stdin closes, and again after a
+# terminate, before the next step. Disclosed in README "When the proxy exits".
+STOP_GRACE_SECONDS = 3.0
+
+
+def _stdin_lines() -> asyncio.Queue[bytes]:
+    """Lines from stdin, read on a daemon thread; b"" marks EOF.
+
+    ⚠ Not ``loop.run_in_executor``: ``asyncio.run`` waits for the default
+    executor at shutdown, and a thread blocked in ``readline`` never returns
+    while the client holds the pipe open, so a proxy whose upstream exited
+    could not exit itself. A daemon thread is left behind instead.
+    """
+    loop = asyncio.get_running_loop()
+    queue: asyncio.Queue[bytes] = asyncio.Queue()
+    stdin = sys.stdin.buffer
+
+    def _read() -> None:
+        while True:
+            try:
+                line = stdin.readline()
+            except Exception:
+                log.debug("stdin read failed; treating it as EOF", exc_info=True)
+                line = b""
+            try:
+                loop.call_soon_threadsafe(queue.put_nowait, line)
+            except RuntimeError:
+                return  # the loop is closed: the proxy is shutting down
+            if not line:
+                return
+
+    threading.Thread(target=_read, name="jmunch-stdin", daemon=True).start()
+    return queue
 
 
 class Proxy:
@@ -74,28 +110,71 @@ class Proxy:
         )
         log.info("spawned upstream pid=%s cmd=%s", self._child.pid, self.config.upstream.command)
 
+        loop = asyncio.get_running_loop()
+        client_gone = asyncio.Event()
+
+        def _on_client_gone() -> None:
+            log.info("the process that started this proxy is gone; exiting")
+            loop.call_soon_threadsafe(client_gone.set)
+
+        lifeline.start(_on_client_gone)
+
         c2s = asyncio.create_task(self._pump_from_stdin(self._child.stdin), name="c2s")
         s2c = asyncio.create_task(self._pump_from_upstream(self._child.stdout), name="s2c")
         child_wait = asyncio.create_task(self._child.wait(), name="child")
+        gone_wait = asyncio.create_task(client_gone.wait(), name="client-gone")
 
         done, pending = await asyncio.wait(
-            {c2s, s2c, child_wait}, return_when=asyncio.FIRST_COMPLETED
+            {c2s, s2c, child_wait, gone_wait}, return_when=asyncio.FIRST_COMPLETED
         )
         for t in pending:
             t.cancel()
 
+        await self._stop_upstream()
         rc = self._child.returncode if self._child.returncode is not None else 0
         log.info("upstream exited rc=%s", rc)
         self.metrics.close()
         return rc
 
+    async def _stop_upstream(self, grace: float = STOP_GRACE_SECONDS) -> None:
+        """End the upstream with us: close its stdin (its normal EOF), then
+        terminate it if it has not exited within ``grace`` seconds, then kill.
+        Without this a proxy that leaves for any reason but a client EOF
+        orphans it.
+
+        ⚠ This reaches the DIRECT child only. A wrapper upstream (``npx.cmd``
+        runs under ``cmd.exe`` on Windows) can leave its own child running.
+        """
+        child = self._child
+        if child is None or child.returncode is not None:
+            return
+        try:
+            if child.stdin is not None and not child.stdin.is_closing():
+                child.stdin.close()
+            await asyncio.wait_for(child.wait(), grace)
+            return
+        except asyncio.TimeoutError:
+            log.debug("upstream still running %ss after EOF; terminating", grace)
+        except Exception:
+            log.debug("closing the upstream's stdin failed", exc_info=True)
+        for stop in (child.terminate, child.kill):
+            try:
+                stop()
+                await asyncio.wait_for(child.wait(), grace)
+                return
+            except ProcessLookupError:
+                return
+            except asyncio.TimeoutError:
+                log.debug("upstream still running after %s", stop.__name__)
+            except Exception:
+                log.debug("%s of the upstream failed", stop.__name__, exc_info=True)
+
     # -- c2s -----------------------------------------------------------------
 
     async def _pump_from_stdin(self, dst: asyncio.StreamWriter) -> None:
-        loop = asyncio.get_running_loop()
-        stdin = sys.stdin.buffer
+        lines = _stdin_lines()
         while True:
-            line = await loop.run_in_executor(None, stdin.readline)
+            line = await lines.get()
             if not line:
                 log.debug("c2s EOF")
                 dst.close()
