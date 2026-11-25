@@ -5,34 +5,9 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.3] — 2026-09-01
-
-### Added
-- `<!-- mcp-name: io.github.jgravelle/jmunch-mcp -->` in `README.md`. The MCP
-  registry proves PyPI-name ownership by looking for this marker in the
-  **published package** README, so publishing 0.2.2 failed 400 without it.
-  PyPI versions are immutable, which is why a marker is a release rather than an
-  edit. `tests/test_version_sync.py` keeps it in step with `server.json`.
-
 ## [Unreleased]
 
-### Added
-- `[tool.hatch.build.targets.sdist]` allowlist. The sdist had no target block, so
-  contents fell back to hatchling's default selection — which honors
-  `.gitignore`, making `.gitignore` the only thing between a working-tree file
-  and PyPI. An allowlist inverts the default: a path is out unless named.
-  Verified against planted decoys (`.env`, `*.bak-*`, `*.local.toml`).
-- `tests/test_no_inline_credentials.py` fails the suite on a secret in a tracked
-  config, and asserts the gitignored `configs/*.local.toml` escape hatch is
-  really ignored.
-- `server.json` for the MCP registry, and `tests/test_version_sync.py` to gate
-  it against `pyproject.toml` — including `packages[].version`, which the
-  registry will happily accept moving on its own. The same file pins the
-  registry's own schema constraints: the first publish attempt was rejected
-  422 on a 141-character description against a 100-character limit, and the
-  publish is human-typed with a five-minute token, so a rejection there costs a
-  full round trip.
-- `CLAUDE.md` and `RELEASING.md`.
+## [0.2.4] — 2026-11-24
 
 ### Fixed
 - The proxy exits when its upstream exits or its client is gone, and stops the
@@ -51,6 +26,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cannot query is never treated as gone. On Windows the check steps past the
   console-script launcher and the venv redirector, which outlive their client.
   `tests/test_proxy_exits.py` kills the parent with stdin held open.
+
+## [0.2.3] — 2026-09-01
+
+The items below shipped in 0.2.3; until 0.2.4 they sat under
+[Unreleased] by mistake.
+
+### Added
+- `<!-- mcp-name: io.github.jgravelle/jmunch-mcp -->` in `README.md`. The MCP
+  registry proves PyPI-name ownership by looking for this marker in the
+  **published package** README, so publishing 0.2.2 failed 400 without it.
+  PyPI versions are immutable, which is why a marker is a release rather than an
+  edit. `tests/test_version_sync.py` keeps it in step with `server.json`.
+- `[tool.hatch.build.targets.sdist]` allowlist. The sdist had no target block, so
+  contents fell back to hatchling's default selection — which honors
+  `.gitignore`, making `.gitignore` the only thing between a working-tree file
+  and PyPI. An allowlist inverts the default: a path is out unless named.
+  Verified against planted decoys (`.env`, `*.bak-*`, `*.local.toml`).
+- `tests/test_no_inline_credentials.py` fails the suite on a secret in a tracked
+  config, and asserts the gitignored `configs/*.local.toml` escape hatch is
+  really ignored.
+- `server.json` for the MCP registry, and `tests/test_version_sync.py` to gate
+  it against `pyproject.toml` — including `packages[].version`, which the
+  registry will happily accept moving on its own. The same file pins the
+  registry's own schema constraints: the first publish attempt was rejected
+  422 on a 141-character description against a 100-character limit, and the
+  publish is human-typed with a five-minute token, so a rejection there costs a
+  full round trip.
+- `CLAUDE.md` and `RELEASING.md`.
+
+### Fixed
 - Six ruff findings in `src/` and ten in `tests/`, which had never been in
   scope. One was not lint: a `t_int` flag in `_infer_columns` assigned and never
   read. Type inference had a single assertion covering it, so tests for all four
